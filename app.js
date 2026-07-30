@@ -814,7 +814,7 @@ const App = {
       if ('Notification' in window && Notification.permission === 'granted') {
         const advance = schedule.reminder.advanceMinutes || 15;
         const catLabel = App.ui.getCategoryLabel(schedule.category);
-        const n = new Notification(`行程提醒: ${schedule.title}`, {
+        const n = new Notification(`小宝的行程: ${schedule.title}`, {
           body: `${advance}分钟后开始 · ${catLabel}`,
           tag: schedule.id,
           icon: 'icon.svg',

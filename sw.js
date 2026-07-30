@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tripler-v3';
+const CACHE_NAME = 'xiaobao-v1';
 const ASSETS = [
   './',
   './index.html',

@@ -1,12 +1,12 @@
 {
-  "name": "行程提醒",
-  "short_name": "行程",
-  "description": "个人行程管理与智能提醒 - 四象限优先级 + AI智能学习",
+  "name": "小宝的行程",
+  "short_name": "小宝行程",
+  "description": "小宝的行程管理 - 四象限优先级 + AI智能学习",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#111827",
+  "background_color": "#0f172a",
   "theme_color": "#6366F1",
   "categories": ["productivity", "utilities"],
   "icons": [

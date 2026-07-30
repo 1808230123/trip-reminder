@@ -6,10 +6,10 @@
   <meta name="theme-color" content="#6366F1">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="行程提醒">
+  <meta name="apple-mobile-web-app-title" content="小宝的行程">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="format-detection" content="telephone=no">
-  <title>行程提醒</title>
+  <title>小宝的行程</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon-192.png">
@@ -29,7 +29,7 @@
         <line x1="3" y1="10" x2="21" y2="10"/>
         <circle cx="12" cy="16" r="1.5" fill="currentColor"/>
       </svg>
-      行程提醒
+      小宝的行程
     </div>
     <nav class="tab-bar">
       <button class="tab-btn active" data-view="today">
@@ -54,7 +54,7 @@
         <div class="greeting" id="greeting"></div>
         <div class="date-info" id="date-info"></div>
         <div class="summary" id="today-summary"></div>
-        <button class="ai-btn" id="btn-ai-analyze" title="让AI分析你的行程模式">
+        <button class="ai-btn" id="btn-ai-analyze" title="让AI分析行程模式">
           <svg class="sparkle" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L9.19 8.63L2 9.24L7.46 13.97L5.82 21L12 17.27L18.18 21L16.54 13.97L22 9.24L14.81 8.63L12 2Z"/></svg>
           AI 智能分析
         </button>
@@ -284,11 +284,11 @@
       <div class="sheet-handle"></div>
       <div class="ai-panel-title" id="ai-panel-title">
         <svg viewBox="0 0 24 24" fill="var(--primary)" width="20" height="20"><path d="M12 2L9.19 8.63L2 9.24L7.46 13.97L5.82 21L12 17.27L18.18 21L16.54 13.97L22 9.24L14.81 8.63L12 2Z"/></svg>
-        AI 行程模式分析
+        AI 智能分析
       </div>
       <div class="ai-loading hidden" id="ai-loading">
         <div class="spinner"></div>
-        <div>AI 正在分析你的行程模式...</div>
+        <div>AI 正在分析小宝的行程模式...</div>
       </div>
       <div id="ai-results"></div>
       <div style="margin-top:16px;">
