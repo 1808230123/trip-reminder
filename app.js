@@ -639,9 +639,10 @@ const App = {
         App.data.addSchedule(newSchedule);
       }
 
+      const wasEditing = App.editingId;
       App.closeScheduleModal();
       App.refresh();
-      App.showToast(App.editingId ? '行程已更新' : '行程已添加');
+      App.showToast(wasEditing ? '行程已更新' : '行程已添加 ✓');
     },
 
     // Show AI analysis panel
@@ -760,52 +761,51 @@ const App = {
       const settings = App.data.loadSettings();
       if (!settings.notification) return;
 
+      // Request notification permission if needed
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+
       const todayStr = new Date().toISOString().split('T')[0];
       const now = new Date();
-      const schedules = App.data.loadSchedules();
 
-      // Check one-time schedules for today
-      schedules.forEach(s => {
-        if (s.scheduledDate !== todayStr && s.repeat.type === 'none') return;
+      // Get ALL schedules active today (one-time + recurring instances)
+      const todaySchedules = App.data.getSchedulesByDate(todayStr);
+
+      todaySchedules.forEach(s => {
         if (s.status !== 'pending') return;
         if (!s.reminder || !s.reminder.enabled) return;
         if (s.reminder.notified) return;
+        if (!s.scheduledTime) return; // All-day: skip timed reminder
 
-        // For recurring, check if it should occur today
-        if (s.repeat.type !== 'none') {
-          const today = new Date(todayStr);
-          const sDate = new Date(s.scheduledDate);
-          const dayOfWeek = today.getDay() === 0 ? 7 : today.getDay();
+        // Parse time robustly for Safari compatibility
+        const timeParts = s.scheduledTime.split(':');
+        const h = parseInt(timeParts[0]) || 0;
+        const m = parseInt(timeParts[1]) || 0;
+        const sec = parseInt(timeParts[2]) || 0;
+        
+        // Build Date using local time components (avoids ISO parsing issues)
+        const dateParts = s.scheduledDate.split('-');
+        const scheduledDateTime = new Date(
+          parseInt(dateParts[0]),
+          parseInt(dateParts[1]) - 1,
+          parseInt(dateParts[2]),
+          h, m, sec
+        );
 
-          let shouldOccur = false;
-          if (s.repeat.type === 'daily') {
-            const diff = Math.floor((today - sDate) / 86400000);
-            shouldOccur = diff >= 0 && diff % (s.repeat.interval || 1) === 0;
-          } else if (s.repeat.type === 'weekly') {
-            const diffWeeks = Math.floor((today - sDate) / (7 * 86400000));
-            shouldOccur = diffWeeks >= 0 && diffWeeks % (s.repeat.interval || 1) === 0
-              && (s.repeat.weekdays || []).includes(dayOfWeek);
-          } else if (s.repeat.type === 'monthly') {
-            shouldOccur = today.getDate() === sDate.getDate();
-          }
+        if (isNaN(scheduledDateTime.getTime())) return;
 
-          if (!shouldOccur) return;
-        }
-
-        if (!s.scheduledTime) return; // All-day events don't trigger timed reminder
-
-        // Calculate reminder trigger time
-        const scheduledDateTime = new Date(`${s.scheduledDate}T${s.scheduledTime}`);
-        const reminderTime = new Date(scheduledDateTime.getTime() - (s.reminder.advanceMinutes || 15) * 60000);
-        const windowEnd = new Date(scheduledDateTime.getTime() + 5 * 60000); // 5min window
+        const advanceMinutes = s.reminder.advanceMinutes || 15;
+        const reminderTime = new Date(scheduledDateTime.getTime() - advanceMinutes * 60000);
+        const windowEnd = new Date(scheduledDateTime.getTime() + 5 * 60000);
 
         if (now >= reminderTime && now <= windowEnd) {
-          // Trigger!
           this.sendNotification(s);
           this.playSound(settings.notification.soundType, settings.notification.soundEnabled);
 
-          // Mark as notified
-          App.data.updateSchedule(s.id, { reminder: { ...s.reminder, notified: true } });
+          // Mark as notified using parent ID for recurring
+          const parentId = s.id.includes('_2') ? s.id.split('_2')[0] : s.id;
+          App.data.updateSchedule(parentId, { reminder: { ...s.reminder, notified: true } });
         }
       });
     },
