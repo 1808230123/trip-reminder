@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#6366F1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="行程提醒">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="format-detection" content="telephone=no">
+  <title>行程提醒</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
+  <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="app-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="4" width="18" height="18" rx="2"/>
+        <line x1="16" y1="2" x2="16" y2="6"/>
+        <line x1="8" y1="2" x2="8" y2="6"/>
+        <line x1="3" y1="10" x2="21" y2="10"/>
+        <circle cx="12" cy="16" r="1.5" fill="currentColor"/>
+      </svg>
+      行程提醒
+    </div>
+    <nav class="tab-bar">
+      <button class="tab-btn active" data-view="today">
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/><circle cx="12" cy="12" r="5"/></svg>
+        今日
+      </button>
+      <button class="tab-btn" data-view="calendar">
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        日历
+      </button>
+      <button class="tab-btn" data-view="settings">
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        设置
+      </button>
+    </nav>
+  </header>
+
+  <!-- Today View -->
+  <main class="app-content">
+    <div id="view-today" class="view active">
+      <div class="today-header">
+        <div class="greeting" id="greeting"></div>
+        <div class="date-info" id="date-info"></div>
+        <div class="summary" id="today-summary"></div>
+        <button class="ai-btn" id="btn-ai-analyze" title="让AI分析你的行程模式">
+          <svg class="sparkle" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L9.19 8.63L2 9.24L7.46 13.97L5.82 21L12 17.27L18.18 21L16.54 13.97L22 9.24L14.81 8.63L12 2Z"/></svg>
+          AI 智能分析
+        </button>
+      </div>
+      <div class="schedule-list" id="today-list"></div>
+    </div>
+
+    <!-- Calendar View -->
+    <div id="view-calendar" class="view">
+      <div class="cal-header">
+        <button class="cal-nav-btn" id="cal-prev">◀</button>
+        <span class="cal-month-title" id="cal-title"></span>
+        <button class="cal-nav-btn" id="cal-next">▶</button>
+      </div>
+      <div class="cal-weekdays" id="cal-weekdays"></div>
+      <div class="cal-grid" id="cal-grid"></div>
+      <div class="cal-day-detail hidden" id="cal-detail"></div>
+    </div>
+
+    <!-- Settings View -->
+    <div id="view-settings" class="view">
+      <!-- AI Config -->
+      <div class="settings-section">
+        <div class="settings-section-title">🤖 AI 配置</div>
+        <div class="provider-preset-btns">
+          <button class="provider-preset active" data-provider="zhipu">智谱GLM</button>
+          <button class="provider-preset" data-provider="openai">OpenAI</button>
+          <button class="provider-preset" data-provider="deepseek">DeepSeek</button>
+          <button class="provider-preset" data-provider="custom">自定义</button>
+        </div>
+        <div class="setting-group-vertical">
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">API 地址</div>
+              <div class="setting-desc">OpenAI 兼容格式的 chat/completions 接口</div>
+            </div>
+            <input class="setting-input" id="ai-api-url" placeholder="https://open.bigmodel.cn/api/paas/v4/chat/completions">
+          </div>
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">API Key</div>
+              <div class="setting-desc">你的密钥仅存储在本地，不会发送到其他地方</div>
+            </div>
+            <div style="display:flex;gap:8px;width:100%;">
+              <input class="setting-input" id="ai-api-key" type="password" placeholder="输入你的API Key" style="flex:1">
+              <button class="btn btn-sm btn-secondary" id="toggle-key-vis">👁</button>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">模型名称</div>
+            </div>
+            <input class="setting-input" id="ai-model" placeholder="glm-4-flash">
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm test-btn" id="btn-test-ai">测试连接</button>
+        <div class="api-status hidden" id="api-status"></div>
+      </div>
+
+      <!-- Notification Settings -->
+      <div class="settings-section">
+        <div class="settings-section-title">🔔 提醒设置</div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">声音提醒</div>
+          </div>
+          <div class="toggle on" id="toggle-sound"></div>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">音效类型</div>
+          </div>
+          <select class="setting-select" id="sound-type">
+            <option value="bell">🔔 铃声</option>
+            <option value="chime">🎵 提示音</option>
+            <option value="digital">💻 电子音</option>
+          </select>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">默认提前提醒</div>
+          </div>
+          <select class="setting-select" id="notify-before">
+            <option value="5">5 分钟</option>
+            <option value="10">10 分钟</option>
+            <option value="15" selected>15 分钟</option>
+            <option value="30">30 分钟</option>
+            <option value="60">1 小时</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Theme -->
+      <div class="settings-section">
+        <div class="settings-section-title">🎨 主题</div>
+        <div class="setting-row">
+          <div class="setting-label">外观</div>
+          <select class="setting-select" id="theme-select">
+            <option value="auto">跟随系统</option>
+            <option value="light">浅色模式</option>
+            <option value="dark">深色模式</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Data Management -->
+      <div class="settings-section">
+        <div class="settings-section-title">💾 数据管理</div>
+        <div class="data-actions">
+          <button class="btn btn-secondary" id="btn-export">导出数据</button>
+          <button class="btn btn-secondary" id="btn-import">导入数据</button>
+          <button class="btn btn-danger" id="btn-clear">清除所有数据</button>
+        </div>
+        <input type="file" id="import-file" accept=".json" class="hidden">
+        <div class="setting-desc" style="margin-top:8px;color:var(--text-muted);font-size:12px;">
+          当前行程数：<span id="schedule-count">0</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- FAB -->
+  <button class="fab" id="fab-add">＋</button>
+
+  <!-- Modal: New/Edit Schedule -->
+  <div class="modal-overlay" id="modal-schedule">
+    <div class="modal-sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title" id="sheet-title">新建行程</div>
+
+      <div class="form-group">
+        <label class="form-label">标题 *</label>
+        <input class="form-input" id="inp-title" placeholder="输入行程标题" required>
+        <button class="ai-recommend-btn hidden" id="btn-ai-recommend">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M12 2L9.19 8.63L2 9.24L7.46 13.97L5.82 21L12 17.27L18.18 21L16.54 13.97L22 9.24L14.81 8.63L12 2Z"/></svg>
+          AI 推荐分类和优先级
+        </button>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">描述</label>
+        <textarea class="form-input" id="inp-desc" placeholder="可选描述"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">分类</label>
+        <div class="cat-selector">
+          <button class="cat-btn" data-cat="work">💼 工作</button>
+          <button class="cat-btn" data-cat="life">🌿 生活</button>
+          <button class="cat-btn" data-cat="social">🎉 社交</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">优先级（四象限）</label>
+        <div class="pri-grid">
+          <div class="pri-cell" data-q="q1">🔴 重要+紧急<br><small>立即做</small></div>
+          <div class="pri-cell" data-q="q2">🟡 重要+不紧急<br><small>计划做</small></div>
+          <div class="pri-cell" data-q="q3">🔵 不重要+紧急<br><small>委托做</small></div>
+          <div class="pri-cell" data-q="q4">⚪ 不重要+不紧急<br><small>减少做</small></div>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">日期 *</label>
+          <input class="form-input" id="inp-date" type="date" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">时间</label>
+          <input class="form-input" id="inp-time" type="time">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">时长（分钟）</label>
+          <input class="form-input" id="inp-duration" type="number" value="60" min="5" max="480">
+        </div>
+        <div class="form-group">
+          <label class="form-label">重复频率</label>
+          <select class="setting-select form-input" id="inp-repeat">
+            <option value="none">不重复</option>
+            <option value="daily">每天</option>
+            <option value="weekly">每周</option>
+            <option value="monthly">每月</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group hidden" id="weekday-group">
+        <label class="form-label">重复的星期</label>
+        <div style="display:flex;gap:6px;">
+          <button class="cat-btn" data-wd="1" style="padding:4px 10px;font-size:12px;">一</button>
+          <button class="cat-btn" data-wd="2" style="padding:4px 10px;font-size:12px;">二</button>
+          <button class="cat-btn" data-wd="3" style="padding:4px 10px;font-size:12px;">三</button>
+          <button class="cat-btn" data-wd="4" style="padding:4px 10px;font-size:12px;">四</button>
+          <button class="cat-btn" data-wd="5" style="padding:4px 10px;font-size:12px;">五</button>
+          <button class="cat-btn" data-wd="6" style="padding:4px 10px;font-size:12px;">六</button>
+          <button class="cat-btn" data-wd="7" style="padding:4px 10px;font-size:12px;">日</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <label class="form-label">提醒</label>
+          <div class="toggle on" id="toggle-reminder"></div>
+          <select class="setting-select" id="inp-advance">
+            <option value="5">提前5分钟</option>
+            <option value="10">提前10分钟</option>
+            <option value="15" selected>提前15分钟</option>
+            <option value="30">提前30分钟</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn btn-secondary" id="btn-cancel">取消</button>
+        <button class="btn btn-primary" id="btn-save">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Analysis Panel -->
+  <div class="ai-panel" id="ai-panel">
+    <div class="ai-panel-content">
+      <div class="sheet-handle"></div>
+      <div class="ai-panel-title" id="ai-panel-title">
+        <svg viewBox="0 0 24 24" fill="var(--primary)" width="20" height="20"><path d="M12 2L9.19 8.63L2 9.24L7.46 13.97L5.82 21L12 17.27L18.18 21L16.54 13.97L22 9.24L14.81 8.63L12 2Z"/></svg>
+        AI 行程模式分析
+      </div>
+      <div class="ai-loading hidden" id="ai-loading">
+        <div class="spinner"></div>
+        <div>AI 正在分析你的行程模式...</div>
+      </div>
+      <div id="ai-results"></div>
+      <div style="margin-top:16px;">
+        <button class="btn btn-secondary" id="btn-ai-close">关闭</button>
+        <button class="btn btn-primary hidden" id="btn-ai-adopt-all">一键采纳所有建议</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="ai.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
