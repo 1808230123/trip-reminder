@@ -35,7 +35,8 @@ const App = {
     },
 
     defaultSchedule() {
-      const today = new Date().toISOString().split('T')[0];
+      const now = new Date();
+      const today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
       return {
         id: 'sch_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
         title: '',
@@ -253,7 +254,8 @@ const App = {
     },
 
     formatDate(date) {
-      const d = new Date(date);
+      const parts = typeof date === 'string' ? date.split('-') : null;
+      const d = parts ? new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])) : new Date(date);
       const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
       return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 周${weekdays[d.getDay()]}`;
     },
@@ -640,9 +642,20 @@ const App = {
       }
 
       const wasEditing = App.editingId;
-      App.closeScheduleModal();
-      App.refresh();
-      App.showToast(wasEditing ? '行程已更新' : '行程已添加 ✓');
+      
+      // Close modal FIRST, then refresh and show toast
+      try {
+        document.getElementById('modal-schedule').classList.remove('open');
+        App.editingId = null;
+        App.selectedWeekdays = [];
+        App.refresh();
+        App.showToast(wasEditing ? '行程已更新 ✓' : '行程已添加 ✓');
+      } catch(e) {
+        console.error('Save error:', e);
+        // Even if refresh fails, ensure modal closes
+        document.getElementById('modal-schedule').classList.remove('open');
+        App.showToast('保存成功');
+      }
     },
 
     // Show AI analysis panel
@@ -910,6 +923,23 @@ const App = {
 
   // ===== INIT =====
   init() {
+    // Force clear old service worker caches
+    if ('caches' in window) {
+      caches.keys().then(names => {
+        names.forEach(name => {
+          if (name !== 'xiaobao-v2') {
+            caches.delete(name);
+          }
+        });
+      });
+    }
+    // Unregister old service workers
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(regs => {
+        regs.forEach(reg => reg.update());
+      });
+    }
+
     // Apply theme
     const settings = App.data.loadSettings();
     App.theme.apply(settings.theme);
@@ -944,20 +974,39 @@ const App = {
       App.ui.openScheduleModal(null);
     });
 
-    // Modal cancel
-    document.getElementById('btn-cancel').addEventListener('click', () => {
-      App.ui.closeScheduleModal();
+    // Modal cancel - robust close
+    document.getElementById('btn-cancel').addEventListener('click', (e) => {
+      e.preventDefault();
+      document.getElementById('modal-schedule').classList.remove('open');
+      App.editingId = null;
+      App.selectedWeekdays = [];
     });
 
     // Click outside modal to close
     document.getElementById('modal-schedule').addEventListener('click', (e) => {
-      if (e.target === document.getElementById('modal-schedule')) {
-        App.ui.closeScheduleModal();
+      if (e.target.id === 'modal-schedule') {
+        document.getElementById('modal-schedule').classList.remove('open');
+        App.editingId = null;
+        App.selectedWeekdays = [];
       }
     });
 
-    // Save schedule
-    document.getElementById('btn-save').addEventListener('click', () => {
+    // ESC key to close modal
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        document.getElementById('modal-schedule').classList.remove('open');
+        document.getElementById('ai-panel').classList.remove('open');
+        App.editingId = null;
+        App.selectedWeekdays = [];
+      }
+    });
+
+    // Save schedule - with visual feedback
+    document.getElementById('btn-save').addEventListener('click', (e) => {
+      e.preventDefault();
+      const btn = e.target.closest('.btn') || e.target;
+      btn.style.transform = 'scale(0.95)';
+      setTimeout(() => { btn.style.transform = ''; }, 150);
       App.ui.saveSchedule();
     });
 

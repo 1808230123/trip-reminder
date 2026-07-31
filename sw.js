@@ -1,4 +1,4 @@
-const CACHE_NAME = 'xiaobao-v2';
+const CACHE_NAME = 'xiaobao-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -17,26 +17,33 @@ self.addEventListener('install', e => {
 });
 
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(keys =>
-    Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-  ));
+  e.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+    )
+  );
   self.clients.claim();
 });
 
+// Network-first strategy: always try network, fall back to cache
+// This ensures users always get the latest code
 self.addEventListener('fetch', e => {
   if (e.request.url.includes('/chat/completions')) return;
   if (e.request.method !== 'GET') return;
 
   e.respondWith(
-    caches.match(e.request).then(r => {
-      if (r) return r;
-      return fetch(e.request).then(resp => {
-        if (resp.ok) {
+    fetch(e.request)
+      .then(resp => {
+        // Cache successful responses
+        if (resp.ok && e.request.url.startsWith(self.location.origin)) {
           const clone = resp.clone();
           caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
         }
         return resp;
-      }).catch(() => caches.match('./index.html'));
-    })
+      })
+      .catch(() => {
+        // Network failed - try cache
+        return caches.match(e.request).then(r => r || caches.match('./index.html'));
+      })
   );
 });

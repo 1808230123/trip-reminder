@@ -419,3 +419,92 @@ textarea.form-input { min-height: 60px; resize: vertical; }
 
 .reminder-badge { font-size: 11px; color: var(--pri-q1); font-weight: 600; animation: pulse 1.5s ease infinite; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+/* ===== v3.1 Enhanced Animations ===== */
+
+/* Modal close animation */
+.modal-overlay { transition: opacity .25s ease; }
+.modal-overlay:not(.open) { opacity: 0; }
+.modal-sheet { transition: transform .3s cubic-bezier(.4,0,.2,1); }
+.modal-overlay:not(.open) .modal-sheet { transform: translateY(100%); }
+
+/* AI panel close animation */
+.ai-panel { transition: opacity .25s ease; }
+.ai-panel:not(.open) { opacity: 0; }
+.ai-panel-content { transition: transform .3s cubic-bezier(.4,0,.2,1); }
+.ai-panel:not(.open) .ai-panel-content { transform: translateY(100%); }
+
+/* Save button success state */
+.btn-primary:active { transform: scale(.96) !important; }
+
+/* Card stagger animation */
+.schedule-card:nth-child(1) { animation-delay: 0ms; }
+.schedule-card:nth-child(2) { animation-delay: 40ms; }
+.schedule-card:nth-child(3) { animation-delay: 80ms; }
+.schedule-card:nth-child(4) { animation-delay: 120ms; }
+.schedule-card:nth-child(5) { animation-delay: 160ms; }
+.schedule-card:nth-child(6) { animation-delay: 200ms; }
+.schedule-card:nth-child(7) { animation-delay: 240ms; }
+.schedule-card:nth-child(8) { animation-delay: 280ms; }
+
+/* Input focus glow */
+.form-input:focus, .setting-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(99,102,241,.12);
+}
+
+/* Smooth scroll for modal */
+.modal-sheet { scroll-behavior: smooth; }
+
+/* Better tap feedback on mobile */
+.cat-btn:active, .pri-cell:active, .cal-day:active {
+  transform: scale(.97);
+  transition: transform .08s ease;
+}
+
+/* Loading state for AI button */
+.ai-btn.loading {
+  pointer-events: none;
+  opacity: .7;
+}
+.ai-btn.loading::after {
+  content: '';
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 2px solid rgba(255,255,255,.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin .6s linear infinite;
+  margin-left: 6px;
+}
+
+/* Save button ripple effect */
+.btn { position: relative; overflow: hidden; }
+.btn::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 0; height: 0;
+  border-radius: 50%;
+  background: rgba(255,255,255,.3);
+  transform: translate(-50%, -50%);
+  transition: width .4s ease, height .4s ease;
+}
+.btn:active::after {
+  width: 200px; height: 200px;
+  transition: width .4s ease, height .4s ease;
+}
+
+/* Today header subtle gradient */
+.today-header .greeting {
+  background: linear-gradient(135deg, var(--primary), var(--cat-social));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Smoother card transitions */
+.schedule-card {
+  transition: transform .2s cubic-bezier(.4,0,.2,1),
+              box-shadow .2s cubic-bezier(.4,0,.2,1),
+              opacity .2s ease;
+}
