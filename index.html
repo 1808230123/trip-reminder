@@ -299,6 +299,28 @@
     </div>
   </div>
 
+  <!-- Force clear old service worker caches BEFORE loading app -->
+  <script>
+  (function() {
+    // Clear ALL caches (including old SW caches)
+    if ('caches' in window) {
+      caches.keys().then(function(names) {
+        names.forEach(function(name) { caches.delete(name); });
+      });
+    }
+    // Unregister ALL service workers, then register fresh one
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(regs) {
+        regs.forEach(function(reg) { reg.unregister(); });
+        // Re-register after clearing
+        setTimeout(function() {
+          navigator.serviceWorker.register('./sw.js').catch(function(){});
+        }, 500);
+      });
+    }
+  })();
+  </script>
+
   <script src="ai.js"></script>
   <script src="app.js"></script>
 </body>
