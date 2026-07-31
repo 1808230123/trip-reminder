@@ -508,3 +508,15 @@ textarea.form-input { min-height: 60px; resize: vertical; }
               box-shadow .2s cubic-bezier(.4,0,.2,1),
               opacity .2s ease;
 }
+
+/* ===== Sound Preset Buttons ===== */
+.sound-preset {
+  padding: 8px 16px; border: 2px solid var(--border); border-radius: var(--radius-sm);
+  font-size: 13px; font-weight: 600; cursor: pointer; background: var(--bg-card);
+  color: var(--text-secondary); transition: all var(--transition-fast);
+}
+.sound-preset:hover { border-color: var(--primary-light); transform: translateY(-1px); }
+.sound-preset.active {
+  border-color: var(--primary); background: var(--primary); color: white;
+  box-shadow: 0 2px 8px rgba(99,102,241,.3);
+}

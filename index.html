@@ -126,12 +126,30 @@
         <div class="setting-row">
           <div>
             <div class="setting-label">音效类型</div>
+            <div class="setting-desc">选择内置音效或上传自定义铃声</div>
           </div>
-          <select class="setting-select" id="sound-type">
-            <option value="bell">🔔 铃声</option>
-            <option value="chime">🎵 提示音</option>
-            <option value="digital">💻 电子音</option>
-          </select>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;">
+          <button class="sound-preset" data-sound="bell">🔔 铃声</button>
+          <button class="sound-preset" data-sound="chime">🎵 提示音</button>
+          <button class="sound-preset" data-sound="digital">💻 电子音</button>
+          <button class="sound-preset" data-sound="gentle">🌊 柔和音</button>
+          <button class="sound-preset" data-sound="custom">🎵 自定义</button>
+        </div>
+        <div id="custom-ringtone-area" class="setting-row" style="display:none;">
+          <div>
+            <div class="setting-label">上传自定义铃声</div>
+            <div class="setting-desc">支持 mp3/wav/m4a，建议小于2MB</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button class="btn btn-sm btn-secondary" id="btn-upload-ringtone">📁 选择文件</button>
+            <button class="btn btn-sm btn-danger hidden" id="btn-remove-ringtone">删除</button>
+          </div>
+          <input type="file" id="ringtone-file" accept="audio/*" class="hidden">
+        </div>
+        <div id="ringtone-preview-area" style="margin:8px 0;">
+          <button class="btn btn-sm btn-secondary" id="btn-preview-sound">▶️ 试听铃声</button>
+          <span id="current-sound-name" style="font-size:12px;color:var(--text-muted);margin-left:8px;"></span>
         </div>
         <div class="setting-row">
           <div>

@@ -487,8 +487,28 @@ const App = {
       // Notification
       const soundToggle = document.getElementById('toggle-sound');
       soundToggle.classList.toggle('on', settings.notification.soundEnabled);
-      document.getElementById('sound-type').value = settings.notification.soundType;
       document.getElementById('notify-before').value = settings.notification.notifyBefore;
+
+      // Sound preset active state
+      document.querySelectorAll('.sound-preset').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.sound === settings.notification.soundType);
+      });
+
+      // Custom ringtone area
+      const customArea = document.getElementById('custom-ringtone-area');
+      if (customArea) {
+        customArea.style.display = settings.notification.soundType === 'custom' ? 'flex' : 'none';
+      }
+
+      // Show remove button if custom ringtone exists
+      const hasCustom = localStorage.getItem('tripler_custom_ringtone');
+      const removeBtn = document.getElementById('btn-remove-ringtone');
+      if (removeBtn) removeBtn.classList.toggle('hidden', !hasCustom);
+
+      // Current sound name
+      const soundNames = { bell: '铃声', chime: '提示音', digital: '电子音', gentle: '柔和音', custom: '自定义铃声' };
+      const soundNameEl = document.getElementById('current-sound-name');
+      if (soundNameEl) soundNameEl.textContent = '当前: ' + (soundNames[settings.notification.soundType] || '铃声');
 
       // Theme
       document.getElementById('theme-select').value = settings.theme;
@@ -843,42 +863,108 @@ const App = {
 
     playSound(type, enabled) {
       if (!enabled) return;
+
+      // Check for custom ringtone first
+      const customRingtone = localStorage.getItem('tripler_custom_ringtone');
+      if (customRingtone) {
+        try {
+          const audio = new Audio(customRingtone);
+          audio.volume = 0.8;
+          audio.play().catch(function(){});
+          return;
+        } catch (e) {
+          console.warn('Custom ringtone playback failed, falling back to default', e);
+        }
+      }
+
+      // Fall back to synthesized sounds
       try {
         if (!this.audioCtx) {
           this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         }
 
         const ctx = this.audioCtx;
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
+        // Resume context if suspended (iOS requirement)
+        if (ctx.state === 'suspended') ctx.resume();
+
+        const playTone = function(freq, waveType, duration, startDelay, volume) {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          const startTime = ctx.currentTime + (startDelay || 0);
+          osc.frequency.setValueAtTime(freq, startTime);
+          osc.type = waveType || 'sine';
+          gain.gain.setValueAtTime(volume || 0.3, startTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+          osc.start(startTime);
+          osc.stop(startTime + duration);
+        };
 
         if (type === 'bell') {
-          osc.frequency.setValueAtTime(880, ctx.currentTime);
-          osc.type = 'sine';
-          gain.gain.setValueAtTime(0.3, ctx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
-          osc.start(ctx.currentTime);
-          osc.stop(ctx.currentTime + 0.5);
+          // Pleasant bell: two-tone chime
+          playTone(880, 'sine', 0.4, 0, 0.3);
+          playTone(1108, 'sine', 0.6, 0.1, 0.15);
         } else if (type === 'chime') {
-          osc.frequency.setValueAtTime(523, ctx.currentTime);
-          osc.type = 'triangle';
-          gain.gain.setValueAtTime(0.3, ctx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.8);
-          osc.start(ctx.currentTime);
-          osc.stop(ctx.currentTime + 0.8);
+          // Musical chime: C-E-G arpeggio
+          playTone(523, 'triangle', 0.3, 0, 0.25);
+          playTone(659, 'triangle', 0.3, 0.12, 0.2);
+          playTone(784, 'triangle', 0.5, 0.24, 0.2);
         } else if (type === 'digital') {
-          osc.frequency.setValueAtTime(1000, ctx.currentTime);
-          osc.type = 'square';
-          gain.gain.setValueAtTime(0.15, ctx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
-          osc.start(ctx.currentTime);
-          osc.stop(ctx.currentTime + 0.3);
+          // Digital beep: three short beeps
+          playTone(1000, 'square', 0.12, 0, 0.15);
+          playTone(1000, 'square', 0.12, 0.18, 0.15);
+          playTone(1200, 'square', 0.2, 0.36, 0.15);
+        } else if (type === 'gentle') {
+          // Gentle wake: soft ascending tone
+          playTone(440, 'sine', 0.8, 0, 0.2);
+          playTone(554, 'sine', 0.8, 0.2, 0.15);
+          playTone(659, 'sine', 1.0, 0.4, 0.15);
         }
       } catch (e) {
         console.warn('Audio playback failed:', e);
       }
+    },
+
+    // Set custom ringtone from file
+    setCustomRingtone(file) {
+      return new Promise(function(resolve, reject) {
+        if (!file) { reject(new Error('No file selected')); return; }
+        // Limit file size to 2MB
+        if (file.size > 2 * 1024 * 1024) {
+          reject(new Error('音频文件不能超过2MB'));
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          try {
+            localStorage.setItem('tripler_custom_ringtone', e.target.result);
+            // Update settings to use custom
+            const settings = App.data.loadSettings();
+            settings.notification.soundType = 'custom';
+            App.data.saveSettings(settings);
+            resolve();
+          } catch(err) {
+            reject(new Error('存储失败，文件可能太大'));
+          }
+        };
+        reader.onerror = function() { reject(new Error('文件读取失败')); };
+        reader.readAsDataURL(file);
+      });
+    },
+
+    // Remove custom ringtone
+    removeCustomRingtone() {
+      localStorage.removeItem('tripler_custom_ringtone');
+      const settings = App.data.loadSettings();
+      settings.notification.soundType = 'bell';
+      App.data.saveSettings(settings);
+    },
+
+    // Preview/test sound
+    previewSound(type) {
+      const settings = App.data.loadSettings();
+      this.playSound(type, true);
     }
   },
 
@@ -1259,6 +1345,72 @@ const App = {
       App.saveSettingsFromForm();
     });
 
+    // Sound preset buttons
+    document.querySelectorAll('.sound-preset').forEach(btn => {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('.sound-preset').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        const sound = this.dataset.sound;
+
+        // Show/hide custom ringtone upload area
+        const customArea = document.getElementById('custom-ringtone-area');
+        customArea.style.display = sound === 'custom' ? 'flex' : 'none';
+
+        // Update setting
+        const settings = App.data.loadSettings();
+        settings.notification.soundType = sound;
+        App.data.saveSettings(settings);
+
+        // Update current sound name
+        const names = { bell: '铃声', chime: '提示音', digital: '电子音', gentle: '柔和音', custom: '自定义铃声' };
+        document.getElementById('current-sound-name').textContent = '当前: ' + (names[sound] || sound);
+
+        // Preview the sound (except custom which needs upload)
+        if (sound !== 'custom') {
+          App.reminder.previewSound(sound);
+        }
+      });
+    });
+
+    // Upload custom ringtone
+    document.getElementById('btn-upload-ringtone').addEventListener('click', function() {
+      document.getElementById('ringtone-file').click();
+    });
+
+    document.getElementById('ringtone-file').addEventListener('change', async function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        await App.reminder.setCustomRingtone(file);
+        document.getElementById('btn-remove-ringtone').classList.remove('hidden');
+        document.getElementById('current-sound-name').textContent = '当前: 自定义 - ' + file.name;
+        App.showToast('铃声上传成功 ✓');
+        // Preview it
+        App.reminder.previewSound('custom');
+      } catch (err) {
+        App.showToast(err.message);
+      }
+      e.target.value = '';
+    });
+
+    // Remove custom ringtone
+    document.getElementById('btn-remove-ringtone').addEventListener('click', function() {
+      App.reminder.removeCustomRingtone();
+      document.getElementById('btn-remove-ringtone').classList.add('hidden');
+      document.getElementById('current-sound-name').textContent = '当前: 铃声';
+      // Switch to bell preset
+      document.querySelectorAll('.sound-preset').forEach(b => b.classList.remove('active'));
+      document.querySelector('.sound-preset[data-sound="bell"]').classList.add('active');
+      document.getElementById('custom-ringtone-area').style.display = 'none';
+      App.showToast('自定义铃声已删除');
+    });
+
+    // Preview sound button
+    document.getElementById('btn-preview-sound').addEventListener('click', function() {
+      const settings = App.data.loadSettings();
+      App.reminder.previewSound(settings.notification.soundType);
+    });
+
     // Theme change
     document.getElementById('theme-select').addEventListener('change', (e) => {
       App.theme.apply(e.target.value);
@@ -1333,7 +1485,7 @@ const App = {
       },
       notification: {
         soundEnabled: document.getElementById('toggle-sound').classList.contains('on'),
-        soundType: document.getElementById('sound-type').value,
+        soundType: App.data.loadSettings().notification.soundType,
         notifyBefore: parseInt(document.getElementById('notify-before').value)
       },
       theme: document.getElementById('theme-select').value,
