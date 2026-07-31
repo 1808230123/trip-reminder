@@ -1,10 +1,11 @@
-const CACHE_NAME = 'xiaobao-v3';
+const CACHE_NAME = 'xiaobao-v4';
 const ASSETS = [
   './',
   './index.html',
   './style.css',
   './app.js',
   './ai.js',
+  './fund.js',
   './manifest.json',
   './icon.svg',
   './icon-192.png',

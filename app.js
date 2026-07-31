@@ -185,6 +185,9 @@ const App = {
         schedules: this.loadSchedules(),
         settings: this.loadSettings(),
         aiSuggestions: this.loadAISuggestions(),
+        funds: typeof Fund !== 'undefined' ? Fund.data.loadFunds() : [],
+        fundTrades: typeof Fund !== 'undefined' ? Fund.data.loadTrades() : [],
+        fundSignals: typeof Fund !== 'undefined' ? Fund.data.loadSignals() : [],
         exportDate: new Date().toISOString()
       };
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -1182,6 +1185,8 @@ const App = {
       App.ui.renderCalendar();
     } else if (App.currentView === 'settings') {
       App.ui.renderSettings();
+    } else if (App.currentView === 'fund') {
+      if (typeof Fund !== 'undefined') Fund.ui.render();
     }
   },
 
@@ -1215,6 +1220,11 @@ const App = {
 
     // Init reminder
     App.reminder.init();
+
+    // Init fund module
+    if (typeof Fund !== 'undefined') {
+      Fund.init();
+    }
 
     // ===== EVENT BINDINGS =====
 

@@ -44,6 +44,10 @@
         <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
         设置
       </button>
+      <button class="tab-btn" data-view="fund">
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+        基金
+      </button>
     </nav>
   </header>
 
@@ -189,7 +193,42 @@
         <input type="file" id="import-file" accept=".json" class="hidden">
         <div class="setting-desc" style="margin-top:8px;color:var(--text-muted);font-size:12px;">
           当前行程数：<span id="schedule-count">0</span><br>
-          版本：v3.1 <span style="color:var(--text-muted)">（如版本低于v3请清除浏览器缓存后重试）</span>
+          版本：v4.0 <span style="color:var(--text-muted)">（如版本低于v4请清除浏览器缓存后重试）</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Fund View -->
+    <div id="view-fund" class="view">
+      <!-- Market Overview -->
+      <div class="fund-market-section">
+        <div class="fund-section-header">
+          <div class="fund-section-title">📈 大盘指数</div>
+          <div class="fund-update-time" id="fund-update-time"></div>
+        </div>
+        <div class="market-indices-scroll" id="market-indices">
+          <div class="fund-loading">加载中...</div>
+        </div>
+      </div>
+
+      <!-- Trading Signals -->
+      <div class="fund-signals-section hidden" id="fund-signals-section">
+        <div class="fund-section-title">⚡ 交易信号</div>
+        <div class="fund-signals-list" id="fund-signals-list"></div>
+      </div>
+
+      <!-- Fund List -->
+      <div class="fund-list-section">
+        <div class="fund-section-header">
+          <div class="fund-section-title">💰 自选基金</div>
+          <button class="btn btn-sm btn-primary" id="btn-add-fund">+ 添加</button>
+        </div>
+        <div class="fund-list" id="fund-list">
+          <div class="empty-state">
+            <div class="empty-icon" style="font-size:48px;">📊</div>
+            <div class="empty-title">暂无自选基金</div>
+            <div class="empty-desc">点击右上角"添加"按钮<br>输入基金代码开始盯盘</div>
+          </div>
         </div>
       </div>
     </div>
@@ -317,6 +356,48 @@
     </div>
   </div>
 
+  <!-- Fund Add/Edit Modal -->
+  <div class="modal-overlay" id="modal-fund">
+    <div class="modal-sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title" id="fund-modal-title">添加基金</div>
+
+      <div class="form-group">
+        <label class="form-label">基金代码 *</label>
+        <input class="form-input" id="inp-fund-code" placeholder="输入6位基金代码（如 161725）" maxlength="6" pattern="[0-9]{6}" inputmode="numeric">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">持有份额</label>
+        <input class="form-input" id="inp-fund-shares" type="number" step="0.01" placeholder="输入持有份额（如 1000）" inputmode="decimal">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">平均成本净值</label>
+        <input class="form-input" id="inp-fund-cost" type="number" step="0.0001" placeholder="买入时的平均净值（如 0.5839）" inputmode="decimal">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">首次买入日期</label>
+        <input class="form-input" id="inp-fund-date" type="date">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">基本面评级</label>
+        <div class="cat-selector">
+          <button class="cat-btn active" data-quality="solid">⭐ 业绩过硬</button>
+          <button class="cat-btn" data-quality="ok">📊 一般</button>
+          <button class="cat-btn" data-quality="weak">⚠️ 基本面差</button>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn btn-secondary" id="btn-fund-cancel">取消</button>
+        <button class="btn btn-primary" id="btn-fund-save">保存</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Force clear old service worker caches BEFORE loading app -->
   <script>
   (function() {
@@ -340,6 +421,7 @@
   </script>
 
   <script src="ai.js"></script>
+  <script src="fund.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
