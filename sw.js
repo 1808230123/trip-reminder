@@ -1,4 +1,4 @@
-const CACHE_NAME = 'xiaobao-v4';
+const CACHE_NAME = 'xiaobao-v5';
 const ASSETS = [
   './',
   './index.html',

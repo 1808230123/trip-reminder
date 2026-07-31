@@ -81,13 +81,16 @@ body {
 .tab-bar { display: flex; gap: 2px; background: var(--bg-hover); border-radius: var(--radius-sm); padding: 3px; }
 
 .tab-btn {
-  padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; border: none;
+  padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; border: none;
   background: transparent; color: var(--text-secondary); transition: all var(--transition-fast);
   min-height: 34px; display: flex; align-items: center; gap: 4px; position: relative;
+  -webkit-tap-highlight-color: transparent;
 }
 .tab-btn:hover { background: rgba(99,102,241,.08); color: var(--text); }
-.tab-btn.active { background: var(--primary); color: white; box-shadow: 0 2px 8px rgba(99,102,241,.3); transform: scale(1.02); }
-.tab-btn .tab-icon { width: 15px; height: 15px; }
+.tab-btn:active { transform: scale(0.94); }
+.tab-btn.active { background: var(--primary); color: white; box-shadow: 0 2px 8px rgba(99,102,241,.3); }
+.tab-btn .tab-icon { width: 15px; height: 15px; transition: transform var(--transition); }
+.tab-btn.active .tab-icon { transform: scale(1.1); }
 
 .app-content { padding: 16px; max-width: 800px; margin: 0 auto; }
 .view { display: none; }
@@ -287,20 +290,23 @@ body {
 
 .modal-overlay {
   position: fixed; inset: 0; z-index: 200;
-  background: rgba(0,0,0,.5); display: none;
+  background: rgba(0,0,0,.5); display: flex;
   align-items: flex-end; justify-content: center;
   backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transition: opacity .25s ease, visibility .25s ease;
 }
-.modal-overlay.open { display: flex; }
+.modal-overlay.open { opacity: 1; visibility: visible; pointer-events: auto; }
 
 .modal-sheet {
   background: var(--bg-card); border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   width: 100%; max-width: 600px; max-height: 90vh;
   overflow-y: auto; padding: 20px 16px calc(20px + var(--safe-bottom));
-  animation: sheetSlideUp .4s cubic-bezier(.4,0,.2,1);
   -webkit-overflow-scrolling: touch;
+  transform: translateY(100%);
+  transition: transform .3s cubic-bezier(.4,0,.2,1);
 }
-@keyframes sheetSlideUp { from { transform: translateY(100%); } to { transform: none; } }
+.modal-overlay.open .modal-sheet { transform: translateY(0); }
 .sheet-handle { width: 36px; height: 4px; border-radius: 2px; background: var(--border); margin: 0 auto 16px; }
 .sheet-title { font-size: 18px; font-weight: 700; margin-bottom: 20px; }
 
@@ -435,10 +441,7 @@ textarea.form-input { min-height: 60px; resize: vertical; }
 /* ===== v3.1 Enhanced Animations ===== */
 
 /* Modal close animation */
-.modal-overlay { transition: opacity .25s ease; }
-.modal-overlay:not(.open) { opacity: 0; }
-.modal-sheet { transition: transform .3s cubic-bezier(.4,0,.2,1); }
-.modal-overlay:not(.open) .modal-sheet { transform: translateY(100%); }
+/* Modal sheet smooth scroll */
 
 /* AI panel close animation */
 .ai-panel { transition: opacity .25s ease; }

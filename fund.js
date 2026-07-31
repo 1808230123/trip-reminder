@@ -82,7 +82,7 @@ const Fund = {
   api: {
     // 通用JSONP方法
     jsonp(url, callbackName, timeout) {
-      timeout = timeout || 10000;
+      timeout = timeout || 6000;
       return new Promise((resolve, reject) => {
         const script = document.createElement('script');
         const timer = setTimeout(() => {
@@ -168,12 +168,18 @@ const Fund = {
         const timeout = setTimeout(() => {
           if (script.parentNode) script.parentNode.removeChild(script);
           reject(new Error('历史数据请求超时'));
-        }, 15000);
+        }, 8000);
         script.src = 'https://fund.eastmoney.com/pingzhongdata/' + code + '.js?v=' + Date.now();
         script.onload = () => {
           clearTimeout(timeout);
           try {
+            // 清理可能存在的旧数据
             const netWorthTrend = window.Data_netWorthTrend || [];
+            if (netWorthTrend.length === 0) {
+              reject(new Error('历史数据为空'));
+              if (script.parentNode) script.parentNode.removeChild(script);
+              return;
+            }
             // 取最近90天
             const recent = netWorthTrend.slice(-90);
             const dates = [];
@@ -190,7 +196,7 @@ const Fund = {
                 changes.push(0);
               }
             }
-            resolve({
+            const result = {
               name: window.fS_name || '',
               dates: dates,
               values: values,
@@ -200,8 +206,14 @@ const Fund = {
                 m3: parseFloat(window.syl_3y || 0),
                 m6: parseFloat(window.syl_6y || 0),
                 y1: parseFloat(window.syl_1n || 0)
-              }
-            });
+              },
+              latestNav: values[values.length - 1] || 0
+            };
+            // 清理全局变量防止污染下次请求
+            try { delete window.Data_netWorthTrend; } catch(e) { window.Data_netWorthTrend = undefined; }
+            try { delete window.fS_name; } catch(e) { window.fS_name = undefined; }
+            try { delete window.fS_code; } catch(e) { window.fS_code = undefined; }
+            resolve(result);
           } catch(e) {
             reject(new Error('解析历史数据失败: ' + e.message));
           }
@@ -463,15 +475,42 @@ const Fund = {
         let holdDays = 0;
         let tagsHtml = '';
 
-        if (val) {
-          navDisplay = val.estimatedNav ? val.estimatedNav.toFixed(4) : (val.nav ? val.nav.toFixed(4) : '--');
+        // 优先用实时估值，其次用历史最新净值
+        let currentPrice = 0;
+        let priceSource = '';
+
+        if (val && val.estimatedNav) {
+          navDisplay = val.estimatedNav.toFixed(4);
           changePct = val.estimatedChange || 0;
-          cardCls = changePct > 0 ? 'up' : (changePct < 0 ? 'down' : 'flat');
+          currentPrice = val.estimatedNav;
+          priceSource = '估值';
+        } else if (val && val.nav) {
+          navDisplay = val.nav.toFixed(4);
+          changePct = val.estimatedChange || 0;
+          currentPrice = val.nav;
+          priceSource = '净值';
+        } else if (history && history.values && history.values.length > 0) {
+          const latestNav = history.values[history.values.length - 1];
+          navDisplay = latestNav.toFixed(4);
+          // 从历史数据计算今日涨跌
+          if (history.changes && history.changes.length > 0) {
+            changePct = (history.changes[history.changes.length - 1] * 100);
+          }
+          currentPrice = latestNav;
+          priceSource = '历史';
+        } else if (fund.holdings && fund.holdings.avgCost) {
+          navDisplay = fund.holdings.avgCost.toFixed(4);
+          currentPrice = fund.holdings.avgCost;
+          priceSource = '成本';
         }
 
+        cardCls = changePct > 0 ? 'up' : (changePct < 0 ? 'down' : 'flat');
+
+        // 基金名称降级：API名称 > 历史名称 > 代码
+        const displayName = fund.name || (history && history.name) || val?.name || ('基金' + fund.code);
+
         // 持仓信息
-        if (fund.holdings && fund.holdings.shares > 0) {
-          const currentPrice = val ? (val.estimatedNav || val.nav || fund.holdings.avgCost) : fund.holdings.avgCost;
+        if (fund.holdings && fund.holdings.shares > 0 && currentPrice > 0) {
           const pl = Fund.engine.calcProfitLoss(fund, currentPrice);
           const plCls = pl.profitLoss > 0 ? 'up' : (pl.profitLoss < 0 ? 'down' : '');
           plHtml = '<div class="fund-stat">' +
@@ -480,6 +519,14 @@ const Fund = {
               (pl.profitLoss >= 0 ? '+' : '') + pl.profitLoss.toFixed(2) +
               ' (' + (pl.profitLossRatio >= 0 ? '+' : '') + (pl.profitLossRatio * 100).toFixed(2) + '%)' +
             '</div>' +
+          '</div>' +
+          '<div class="fund-stat">' +
+            '<div class="fund-stat-label">当前市值</div>' +
+            '<div class="fund-stat-value">' + pl.currentValue.toFixed(2) + '</div>' +
+          '</div>' +
+          '<div class="fund-stat">' +
+            '<div class="fund-stat-label">持仓份额</div>' +
+            '<div class="fund-stat-value">' + fund.holdings.shares.toFixed(2) + '</div>' +
           '</div>';
 
           // 持仓天数
@@ -526,12 +573,11 @@ const Fund = {
         }
 
         const arrow = changePct > 0 ? '▲' : (changePct < 0 ? '▼' : '—');
-        const name = fund.name || val?.name || '未知基金';
 
         return '<div class="fund-card ' + cardCls + '" data-fund-id="' + fund.id + '">' +
           '<div class="fund-card-header">' +
             '<div>' +
-              '<div class="fund-card-name">' + name + '</div>' +
+              '<div class="fund-card-name">' + displayName + '</div>' +
               '<div class="fund-card-code">' + fund.code + '</div>' +
             '</div>' +
             '<div class="fund-card-valuation">' +
@@ -540,7 +586,7 @@ const Fund = {
             '</div>' +
           '</div>' +
           '<div class="fund-card-body">' + plHtml +
-            (val && val.estimateTime ? '<div class="fund-stat"><div class="fund-stat-label">估值时间</div><div class="fund-stat-value" style="font-size:12px;">' + val.estimateTime.slice(11, 16) + '</div></div>' : '') +
+            (priceSource ? '<div class="fund-stat"><div class="fund-stat-label">数据来源</div><div class="fund-stat-value" style="font-size:12px;">' + priceSource + '</div></div>' : '') +
           '</div>' +
           (tagsHtml ? '<div class="fund-card-tags">' + tagsHtml + '</div>' : '') +
           '<div class="fund-card-actions">' +
@@ -627,17 +673,24 @@ const Fund = {
       const quality = Fund.selectedQuality;
 
       if (!code || !/^\d{6}$/.test(code)) {
-        App.toast('请输入6位数字基金代码');
+        App.showToast('请输入6位数字基金代码');
         return;
       }
 
-      // 尝试从估值数据获取基金名称
+      // 检查是否已存在（新增模式下）
+      if (!Fund.editingFundId) {
+        const existing = Fund.data.loadFunds().find(f => f.code === code);
+        if (existing) {
+          App.showToast('该基金已存在');
+          return;
+        }
+      }
+
+      // 先构建数据并立即保存，不阻塞等待网络请求
       let fundName = '';
-      try {
-        const val = await Fund.api.fetchFundValuation(code);
-        if (val && val.name) fundName = val.name;
-      } catch(e) {
-        // 获取名称失败不阻止保存
+      if (Fund.editingFundId) {
+        const existing = Fund.data.loadFunds().find(f => f.id === Fund.editingFundId);
+        if (existing) fundName = existing.name || '';
       }
 
       const fundData = {
@@ -654,30 +707,38 @@ const Fund = {
       };
 
       if (Fund.editingFundId) {
-        // 编辑模式：保留名称和createdAt
         const existing = Fund.data.loadFunds().find(f => f.id === Fund.editingFundId);
         if (existing) {
-          fundData.name = existing.name || fundName;
           fundData.createdAt = existing.createdAt;
         }
         Fund.data.updateFund(Fund.editingFundId, fundData);
-        App.toast('基金已更新');
+        App.showToast('基金已更新');
       } else {
-        // 检查是否已存在
-        const existing = Fund.data.loadFunds().find(f => f.code === code);
-        if (existing) {
-          App.toast('该基金已存在');
-          return;
-        }
         fundData.id = 'fund_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
         Fund.data.addFund(fundData);
-        App.toast('基金已添加，正在获取数据...');
-        // 立即获取估值和历史
-        Fund.scheduler.refreshAll();
+        App.showToast('基金已添加，正在获取数据...');
       }
 
+      // 先关闭模态框并刷新列表，让用户立即看到结果
       this.close();
       Fund.ui.renderFundList();
+
+      // 异步获取基金名称（不阻塞保存流程）
+      if (!fundName) {
+        Fund.api.fetchFundValuation(code).then(val => {
+          if (val && val.name) {
+            const fundId = Fund.editingFundId || fundData.id;
+            Fund.data.updateFund(fundId, { name: val.name });
+            Fund.ui.renderFundList();
+          }
+        }).catch(() => {
+          // 获取名称失败，后台静默处理
+          console.warn('基金名称获取失败，可稍后自动补全');
+        });
+      }
+
+      // 异步刷新估值数据
+      Fund.scheduler.refreshAll();
     }
   },
 
@@ -794,11 +855,11 @@ const Fund = {
     async analyzeFund(fund, history) {
       const settings = App.data.loadSettings();
       if (!settings.ai || !settings.ai.apiKey) {
-        App.toast('请先在设置中配置AI API Key');
+        App.showToast('请先在设置中配置AI API Key');
         return null;
       }
 
-      App.toast('正在分析 ' + (fund.name || fund.code) + '...');
+      App.showToast('正在分析 ' + (fund.name || fund.code) + '...');
 
       // 构建分析数据
       const returns = history?.returns || {};
@@ -847,7 +908,7 @@ const Fund = {
       aiCache[fund.code] = { result: result, updatedAt: new Date().toISOString() };
       Fund.data.saveAICache(aiCache);
 
-      App.toast((fund.name || fund.code) + ' 分析完成: ' + result.reason);
+      App.showToast((fund.name || fund.code) + ' 分析完成: ' + result.reason);
       Fund.ui.renderFundList();
       return result;
     }
@@ -948,18 +1009,33 @@ const Fund = {
     });
 
     // 模态框取消
-    document.getElementById('btn-fund-cancel').addEventListener('click', () => {
+    document.getElementById('btn-fund-cancel').addEventListener('click', (e) => {
+      e.preventDefault();
       this.modal.close();
     });
 
-    // 模态框保存
-    document.getElementById('btn-fund-save').addEventListener('click', () => {
+    // 模态框保存 - 带视觉反馈
+    document.getElementById('btn-fund-save').addEventListener('click', (e) => {
+      e.preventDefault();
+      const btn = e.target.closest('.btn') || e.target;
+      btn.style.transform = 'scale(0.95)';
+      setTimeout(() => { btn.style.transform = ''; }, 150);
       this.modal.save();
     });
 
     // 点击模态框外部关闭
     document.getElementById('modal-fund').addEventListener('click', (e) => {
-      if (e.target.id === 'modal-fund') this.modal.close();
+      if (e.target.id === 'modal-fund') {
+        e.preventDefault();
+        this.modal.close();
+      }
+    });
+
+    // ESC键关闭基金模态框
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && document.getElementById('modal-fund').classList.contains('open')) {
+        this.modal.close();
+      }
     });
 
     // 基本面评级选择
@@ -980,6 +1056,9 @@ const Fund = {
       const fundId = card.dataset.fundId;
       const action = btn.dataset.action;
 
+      // 触觉反馈
+      if ('vibrate' in navigator) navigator.vibrate(10);
+
       if (action === 'edit') {
         this.modal.openEdit(fundId);
       } else if (action === 'ai') {
@@ -992,7 +1071,7 @@ const Fund = {
         if (confirm('确认删除该基金？相关数据将一并清除。')) {
           this.data.removeFund(fundId);
           this.ui.renderFundList();
-          App.toast('基金已删除');
+          App.showToast('基金已删除');
         }
       }
     });
