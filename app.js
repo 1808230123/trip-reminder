@@ -771,6 +771,22 @@ const App = {
         Notification.requestPermission();
       }
 
+      // Pre-warm AudioContext on first user gesture (CRITICAL for iOS Safari)
+      // Browsers require AudioContext to be created/resumed within a user gesture.
+      // Without this, playSound() called from the 30s timer will be blocked.
+      const warmUp = () => {
+        this.ensureAudioContext().then(ctx => {
+          if (ctx && ctx.state === 'running') {
+            console.log('AudioContext pre-warmed successfully');
+          }
+        });
+        // Remove listeners after first successful warm-up
+        document.removeEventListener('touchstart', warmUp);
+        document.removeEventListener('click', warmUp);
+      };
+      document.addEventListener('touchstart', warmUp, { once: false });
+      document.addEventListener('click', warmUp, { once: false });
+
       // Start 30-second check cycle
       this.startPolling();
 
@@ -799,8 +815,12 @@ const App = {
         Notification.requestPermission();
       }
 
-      const todayStr = new Date().toISOString().split('T')[0];
-      const now = new Date();
+      // Use local date components to avoid UTC off-by-one (toISOString returns UTC)
+      const nowLocal = new Date();
+      const todayStr = nowLocal.getFullYear() + '-' +
+        String(nowLocal.getMonth() + 1).padStart(2, '0') + '-' +
+        String(nowLocal.getDate()).padStart(2, '0');
+      const now = nowLocal;
 
       // Get ALL schedules active today (one-time + recurring instances)
       const todaySchedules = App.data.getSchedulesByDate(todayStr);
@@ -834,7 +854,7 @@ const App = {
 
         if (now >= reminderTime && now <= windowEnd) {
           this.sendNotification(s);
-          this.playSound(settings.notification.soundType, settings.notification.soundEnabled);
+          this.playSound(settings.notification.soundType, settings.notification.soundEnabled).catch(function(){});
 
           // Mark as notified using parent ID for recurring
           const parentId = s.id.includes('_2') ? s.id.split('_2')[0] : s.id;
@@ -844,50 +864,162 @@ const App = {
     },
 
     sendNotification(schedule) {
-      if ('Notification' in window && Notification.permission === 'granted') {
-        const advance = schedule.reminder.advanceMinutes || 15;
-        const catLabel = App.ui.getCategoryLabel(schedule.category);
-        const n = new Notification(`小宝的行程: ${schedule.title}`, {
-          body: `${advance}分钟后开始 · ${catLabel}`,
-          tag: schedule.id,
-          icon: 'icon.svg',
-          requireInteraction: false
-        });
+      const advance = schedule.reminder.advanceMinutes || 15;
+      const catLabel = App.ui.getCategoryLabel(schedule.category);
 
-        n.onclick = () => {
-          window.focus();
-          n.close();
-        };
+      // System notification (works on desktop + Android Chrome)
+      if ('Notification' in window && Notification.permission === 'granted') {
+        try {
+          const n = new Notification(`小宝的行程: ${schedule.title}`, {
+            body: `${advance}分钟后开始 · ${catLabel}`,
+            tag: schedule.id,
+            icon: 'icon.svg',
+            requireInteraction: false
+          });
+
+          n.onclick = () => {
+            window.focus();
+            n.close();
+          };
+        } catch(e) {
+          console.warn('System notification failed:', e);
+        }
+      }
+
+      // In-app banner notification (works on iOS Safari PWA where system notifications are unreliable)
+      this.showInAppBanner(schedule, advance, catLabel);
+    },
+
+    // Show an in-app floating banner for reminders
+    showInAppBanner(schedule, advance, catLabel) {
+      const catColors = {
+        work: '#6366f1', life: '#10b981', social: '#f59e0b'
+      };
+      const color = catColors[schedule.category] || '#6366f1';
+
+      // Remove any existing banner
+      const existing = document.getElementById('reminder-banner');
+      if (existing) existing.remove();
+
+      const banner = document.createElement('div');
+      banner.id = 'reminder-banner';
+      banner.style.cssText = `
+        position: fixed; top: 0; left: 0; right: 0; z-index: 10000;
+        background: linear-gradient(135deg, ${color}, ${color}dd);
+        color: white; padding: 14px 16px; padding-top: max(14px, env(safe-area-inset-top));
+        display: flex; align-items: center; gap: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        transform: translateY(-100%); transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      `;
+
+      const iconDiv = document.createElement('div');
+      iconDiv.style.cssText = `
+        width: 36px; height: 36px; border-radius: 50%;
+        background: rgba(255,255,255,0.25); display: flex;
+        align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0;
+      `;
+      iconDiv.textContent = '🔔';
+
+      const textDiv = document.createElement('div');
+      textDiv.style.cssText = 'flex: 1; min-width: 0;';
+      textDiv.innerHTML = `
+        <div style="font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${schedule.title}</div>
+        <div style="font-size: 12px; opacity: 0.9; margin-top: 2px;">${advance}分钟后开始 · ${catLabel}</div>
+      `;
+
+      const closeBtn = document.createElement('button');
+      closeBtn.style.cssText = `
+        background: rgba(255,255,255,0.2); border: none; color: white;
+        width: 28px; height: 28px; border-radius: 50%; font-size: 16px;
+        cursor: pointer; flex-shrink: 0; display: flex; align-items: center;
+        justify-content: center; -webkit-tap-highlight-color: transparent;
+      `;
+      closeBtn.textContent = '✕';
+      closeBtn.onclick = () => {
+        banner.style.transform = 'translateY(-100%)';
+        setTimeout(() => banner.remove(), 400);
+      };
+
+      banner.appendChild(iconDiv);
+      banner.appendChild(textDiv);
+      banner.appendChild(closeBtn);
+      document.body.appendChild(banner);
+
+      // Animate in
+      requestAnimationFrame(() => {
+        banner.style.transform = 'translateY(0)';
+      });
+
+      // Auto-dismiss after 15 seconds
+      setTimeout(() => {
+        if (banner.parentNode) {
+          banner.style.transform = 'translateY(-100%)';
+          setTimeout(() => {
+            if (banner.parentNode) banner.remove();
+          }, 400);
+        }
+      }, 15000);
+
+      // Vibrate if supported (mobile)
+      if ('vibrate' in navigator) {
+        navigator.vibrate([200, 100, 200]);
       }
     },
 
-    playSound(type, enabled) {
+    // Ensure AudioContext is ready (must be called from user gesture)
+    async ensureAudioContext() {
+      if (!this.audioCtx) {
+        try {
+          this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        } catch(e) {
+          console.warn('Cannot create AudioContext:', e);
+          return null;
+        }
+      }
+      // Resume if suspended - CRITICAL for iOS Safari and Chrome
+      if (this.audioCtx.state === 'suspended') {
+        try {
+          await this.audioCtx.resume();
+        } catch(e) {
+          console.warn('Cannot resume AudioContext:', e);
+        }
+      }
+      return this.audioCtx;
+    },
+
+    async playSound(type, enabled) {
       if (!enabled) return;
 
       // Check for custom ringtone first
-      const customRingtone = localStorage.getItem('tripler_custom_ringtone');
-      if (customRingtone) {
-        try {
-          const audio = new Audio(customRingtone);
-          audio.volume = 0.8;
-          audio.play().catch(function(){});
-          return;
-        } catch (e) {
-          console.warn('Custom ringtone playback failed, falling back to default', e);
+      if (type === 'custom') {
+        const customRingtone = localStorage.getItem('tripler_custom_ringtone');
+        if (customRingtone) {
+          try {
+            const audio = new Audio(customRingtone);
+            audio.volume = 0.8;
+            await audio.play();
+            return;
+          } catch (e) {
+            console.warn('Custom ringtone failed, using default', e);
+            type = 'bell'; // Fallback
+          }
+        } else {
+          type = 'bell';
         }
       }
 
-      // Fall back to synthesized sounds
+      // Synthesized sounds - ensure context is running first
       try {
-        if (!this.audioCtx) {
-          this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const ctx = await this.ensureAudioContext();
+        if (!ctx || ctx.state !== 'running') {
+          console.warn('AudioContext not running, state:', ctx ? ctx.state : 'null');
+          // Fallback: try HTML5 Audio with a short beep data URI
+          this.fallbackBeep();
+          return;
         }
 
-        const ctx = this.audioCtx;
-        // Resume context if suspended (iOS requirement)
-        if (ctx.state === 'suspended') ctx.resume();
-
-        const playTone = function(freq, waveType, duration, startDelay, volume) {
+        const playTone = (freq, waveType, duration, startDelay, volume) => {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
           osc.connect(gain);
@@ -895,31 +1027,30 @@ const App = {
           const startTime = ctx.currentTime + (startDelay || 0);
           osc.frequency.setValueAtTime(freq, startTime);
           osc.type = waveType || 'sine';
-          gain.gain.setValueAtTime(volume || 0.3, startTime);
-          gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+          gain.gain.setValueAtTime(0, startTime);
+          gain.gain.linearRampToValueAtTime(volume || 0.3, startTime + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
           osc.start(startTime);
           osc.stop(startTime + duration);
         };
 
         if (type === 'bell') {
-          // Pleasant bell: two-tone chime
-          playTone(880, 'sine', 0.4, 0, 0.3);
-          playTone(1108, 'sine', 0.6, 0.1, 0.15);
+          playTone(880, 'sine', 0.5, 0, 0.3);
+          playTone(1108, 'sine', 0.7, 0.1, 0.15);
+          playTone(1318, 'sine', 0.8, 0.2, 0.08);
         } else if (type === 'chime') {
-          // Musical chime: C-E-G arpeggio
-          playTone(523, 'triangle', 0.3, 0, 0.25);
-          playTone(659, 'triangle', 0.3, 0.12, 0.2);
-          playTone(784, 'triangle', 0.5, 0.24, 0.2);
+          playTone(523, 'triangle', 0.35, 0, 0.25);
+          playTone(659, 'triangle', 0.35, 0.12, 0.2);
+          playTone(784, 'triangle', 0.6, 0.24, 0.2);
+          playTone(1046, 'triangle', 0.8, 0.36, 0.1);
         } else if (type === 'digital') {
-          // Digital beep: three short beeps
           playTone(1000, 'square', 0.12, 0, 0.15);
           playTone(1000, 'square', 0.12, 0.18, 0.15);
-          playTone(1200, 'square', 0.2, 0.36, 0.15);
+          playTone(1200, 'square', 0.25, 0.36, 0.15);
         } else if (type === 'gentle') {
-          // Gentle wake: soft ascending tone
           playTone(440, 'sine', 0.8, 0, 0.2);
           playTone(554, 'sine', 0.8, 0.2, 0.15);
-          playTone(659, 'sine', 1.0, 0.4, 0.15);
+          playTone(659, 'sine', 1.2, 0.4, 0.15);
         }
       } catch (e) {
         console.warn('Audio playback failed:', e);
@@ -961,10 +1092,57 @@ const App = {
       App.data.saveSettings(settings);
     },
 
-    // Preview/test sound
-    previewSound(type) {
-      const settings = App.data.loadSettings();
-      this.playSound(type, true);
+    // Preview/test sound - called from user click
+    async previewSound(type) {
+      await this.playSound(type, true);
+    },
+
+    // Fallback beep using HTML5 Audio (no AudioContext needed)
+    // Uses a short WAV data URI - works even when AudioContext is suspended
+    fallbackBeep() {
+      try {
+        // Short beep: 880Hz sine wave, 0.3s, generated as WAV
+        const sampleRate = 8000;
+        const duration = 0.3;
+        const numSamples = Math.floor(sampleRate * duration);
+        const freq = 880;
+        const buffer = new ArrayBuffer(44 + numSamples * 2);
+        const view = new DataView(buffer);
+        // WAV header
+        const writeStr = (offset, str) => { for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)); };
+        writeStr(0, 'RIFF');
+        view.setUint32(4, 36 + numSamples * 2, true);
+        writeStr(8, 'WAVE');
+        writeStr(12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);        // PCM
+        view.setUint16(22, 1, true);        // mono
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * 2, true);
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+        writeStr(36, 'data');
+        view.setUint32(40, numSamples * 2, true);
+        // Audio data - sine wave with envelope
+        for (let i = 0; i < numSamples; i++) {
+          const t = i / sampleRate;
+          const envelope = Math.exp(-t * 3); // decay
+          const sample = Math.sin(2 * Math.PI * freq * t) * envelope * 0.5;
+          view.setInt16(44 + i * 2, sample * 32767, true);
+        }
+        // Convert to base64
+        let binary = '';
+        const bytes = new Uint8Array(buffer);
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        const dataURI = 'data:audio/wav;base64,' + btoa(binary);
+        const audio = new Audio(dataURI);
+        audio.volume = 0.6;
+        audio.play().catch(function(e) {
+          console.warn('Fallback beep also failed:', e);
+        });
+      } catch(e) {
+        console.warn('Fallback beep generation failed:', e);
+      }
     }
   },
 
